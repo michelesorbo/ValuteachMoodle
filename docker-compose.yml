@@ -1,0 +1,48 @@
+# Production stack for Coolify (Docker Compose build pack).
+# Set in Coolify: POSTGRES_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL (public https URL)
+# and SCORM_ORIGIN (https URL of a second domain, e.g. scorm.example.com, routed to this same app).
+# Coolify handles HTTPS and routing to the app on port 3000.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://newlms:${POSTGRES_PASSWORD:?}@db:5432/newlms
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?}
+      SCORM_ORIGIN: ${SCORM_ORIGIN:?}
+      # First start only: creates the admin if none exists. Remove the password afterwards.
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
+      FILES_DIR: /data/files
+      MAX_FILE_UPLOAD_MB: ${MAX_FILE_UPLOAD_MB:-100}
+      MAX_SCORM_UPLOAD_MB: ${MAX_SCORM_UPLOAD_MB:-500}
+      MAX_SCORM_EXTRACTED_MB: ${MAX_SCORM_EXTRACTED_MB:-2000}
+      MAX_VIDEO_UPLOAD_MB: ${MAX_VIDEO_UPLOAD_MB:-1024}
+    expose:
+      - "3000"
+    volumes:
+      - newlms-files:/data/files
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: newlms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: newlms
+    volumes:
+      - newlms-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newlms -d newlms"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  newlms-files:
+  newlms-db:

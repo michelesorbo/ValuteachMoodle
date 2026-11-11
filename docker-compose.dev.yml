@@ -1,0 +1,21 @@
+# Local development: only PostgreSQL. The app runs with `pnpm dev`.
+name: newlms-dev
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: newlms
+      POSTGRES_PASSWORD: newlms
+      POSTGRES_DB: newlms
+    ports:
+      - "5433:5432"
+    volumes:
+      - newlms-dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newlms -d newlms"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  newlms-dev-db:

@@ -1,0 +1,7 @@
+# Local trial of the production stack ("prova su una copia"): publishes the app on a port,
+# which Coolify's proxy does in production. See docs/deploy-coolify.md.
+#   docker compose -p newlms-trial -f docker-compose.yml -f docker-compose.local.yml up -d --build --wait
+services:
+  app:
+    ports:
+      - "${TRIAL_PORT:-3200}:3000"

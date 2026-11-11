@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <title>Modulo di prova</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>Modulo di prova SCORM 1.2</h1>
+    <dl>
+      <dt>API</dt>
+      <dd id="api">…</dd>
+      <dt>Studente</dt>
+      <dd id="student"></dd>
+      <dt>Stato</dt>
+      <dd id="status"></dd>
+      <dt>Ingresso</dt>
+      <dd id="entry"></dd>
+      <dt>Posizione</dt>
+      <dd id="location"></dd>
+      <dt>Dati di ripresa</dt>
+      <dd id="suspend"></dd>
+      <dt>Tempo totale</dt>
+      <dd id="total"></dd>
+    </dl>
+    <p>
+      <button id="suspend-button" type="button">Salva e sospendi</button>
+      <button id="complete-button" type="button">Completa con punteggio 90</button>
+      <button id="fail-button" type="button">Termina con punteggio 50</button>
+    </p>
+    <p id="result" role="status"></p>
+    <script src="sco.js"></script>
+  </body>
+</html>

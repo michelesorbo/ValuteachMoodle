@@ -1,0 +1,203 @@
+{
+  "app": {
+    "name": "NewLMS",
+    "description": "Piattaforma di formazione",
+    "loading": "Caricamento…",
+    "skipToContent": "Vai al contenuto"
+  },
+  "nav": {
+    "main": "Navigazione principale",
+    "home": "Corsi",
+    "users": "Utenti",
+    "signedInAs": "Accesso effettuato come {name}",
+    "logout": "Esci"
+  },
+  "errors": {
+    "invalid": "Controlla i dati inseriti.",
+    "forbidden": "Non hai i permessi per questa operazione.",
+    "notFound": "Elemento non trovato.",
+    "alreadyEnrolled": "L'utente è già iscritto a questo corso.",
+    "generic": "Si è verificato un errore. Riprova."
+  },
+  "notFound": {
+    "title": "Pagina non trovata",
+    "description": "La pagina non esiste oppure non hai i permessi per vederla.",
+    "back": "Torna ai corsi"
+  },
+  "auth": {
+    "login": {
+      "title": "Accedi",
+      "intro": "Inserisci le credenziali ricevute dall'amministratore.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Accedi",
+      "submitting": "Accesso in corso…",
+      "error": "Email o password non corretti.",
+      "tooManyAttempts": "Troppi tentativi di accesso. Attendi qualche secondo e riprova."
+    }
+  },
+  "courses": {
+    "roles": {
+      "student": "Studente",
+      "teacher": "Docente",
+      "admin": "Amministratore"
+    },
+    "lessonTypes": {
+      "text": "Testo",
+      "file": "File",
+      "video": "Video",
+      "scorm": "SCORM"
+    },
+    "fields": {
+      "title": "Titolo",
+      "description": "Descrizione"
+    },
+    "progress": {
+      "label": "Avanzamento del corso",
+      "summary": "{completed} di {total} lezioni completate",
+      "courseCompleted": "Corso completato",
+      "noLessons": "Nessuna lezione"
+    },
+    "list": {
+      "title": "Ciao, {name}",
+      "subtitle": "I tuoi corsi",
+      "subtitleAdmin": "Tutti i corsi",
+      "empty": "Non sei ancora iscritto a nessun corso.",
+      "emptyAdmin": "Non ci sono ancora corsi.",
+      "new": "Nuovo corso",
+      "yourRole": "Il tuo ruolo: {role}"
+    },
+    "new": {
+      "title": "Nuovo corso",
+      "submit": "Crea corso",
+      "back": "Torna ai corsi"
+    },
+    "detail": {
+      "back": "Torna ai corsi",
+      "manage": "Gestisci il corso",
+      "lessons": "Lezioni",
+      "noLessons": "Questo corso non ha ancora lezioni.",
+      "completed": "Completata",
+      "toDo": "Da completare"
+    },
+    "lesson": {
+      "back": "Torna al corso",
+      "download": "Scarica {name}",
+      "fileMissing": "Il file di questa lezione non è disponibile.",
+      "markCompleted": "Segna come completata",
+      "completed": "Lezione completata",
+      "scormFrame": "Contenuto SCORM: {title}",
+      "scormPreview": "Stai vedendo il contenuto in anteprima: i progressi vengono registrati solo per gli studenti.",
+      "scormPending": "La lezione risulterà completata quando il contenuto comunica il completamento.",
+      "scormMissing": "Il pacchetto di questa lezione non è disponibile.",
+      "videoWatched": "Hai guardato il {percent}% del video.",
+      "videoPending": "La lezione risulterà completata dopo aver guardato almeno il 90% del video.",
+      "videoPreview": "Stai vedendo il video in anteprima: i progressi vengono registrati solo per gli studenti."
+    },
+    "manage": {
+      "title": "Gestione del corso",
+      "back": "Torna al corso",
+      "details": "Dati del corso",
+      "save": "Salva",
+      "saved": "Modifiche salvate.",
+      "delete": "Elimina il corso",
+      "deleteConfirm": "Eliminare il corso con tutte le lezioni, i file, le iscrizioni e i progressi? L'operazione non si può annullare.",
+      "lessons": "Lezioni",
+      "noLessons": "Nessuna lezione. Aggiungine una qui sotto.",
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù",
+      "lessonActions": "Azioni per la lezione «{title}»",
+      "edit": "Modifica",
+      "deleteLesson": "Elimina",
+      "deleteLessonConfirm": "Eliminare questa lezione? Verranno eliminati anche il file allegato e i progressi degli studenti.",
+      "addText": "Nuova lezione di testo",
+      "addFile": "Nuova lezione con file",
+      "lessonTitle": "Titolo della lezione",
+      "content": "Testo della lezione",
+      "file": "File",
+      "fileHint": "Dimensione massima: {max} MB.",
+      "add": "Aggiungi lezione",
+      "added": "Lezione aggiunta.",
+      "uploadErrors": {
+        "tooLarge": "Il file supera la dimensione massima consentita.",
+        "empty": "Seleziona un file non vuoto.",
+        "forbidden": "Non hai i permessi per caricare file in questo corso.",
+        "generic": "Caricamento non riuscito. Riprova.",
+        "invalidZip": "Il file non è un archivio zip valido.",
+        "unsafeZip": "L'archivio contiene percorsi non sicuri ed è stato rifiutato.",
+        "zipTooLarge": "Il contenuto dell'archivio è troppo grande o ha troppi file.",
+        "noManifest": "Nel pacchetto manca il file imsmanifest.xml.",
+        "invalidManifest": "Il file imsmanifest.xml non è valido o non indica un contenuto da avviare.",
+        "scorm2004": "Il pacchetto è SCORM 2004: è supportato solo SCORM 1.2.",
+        "notMp4": "Il file non è un video MP4 valido."
+      },
+      "editLesson": "Modifica lezione",
+      "members": "Iscritti",
+      "membersCaption": "Utenti iscritti al corso",
+      "noMembers": "Nessun iscritto.",
+      "name": "Nome",
+      "email": "Email",
+      "role": "Ruolo",
+      "progress": "Avanzamento",
+      "actions": "Azioni",
+      "remove": "Rimuovi",
+      "removeConfirm": "Rimuovere {name} dal corso?",
+      "enroll": "Iscrivi un utente",
+      "user": "Utente",
+      "noUsers": "Tutti gli utenti sono già iscritti a questo corso.",
+      "enrollSubmit": "Iscrivi",
+      "enrolled": "Utente iscritto.",
+      "addScorm": "Nuova lezione SCORM",
+      "scormPackage": "Pacchetto SCORM 1.2 (.zip)",
+      "scormHint": "File zip con imsmanifest.xml. Dimensione massima: {max} MB.",
+      "addVideo": "Nuova lezione video",
+      "videoFile": "Video (.mp4)",
+      "videoHint": "File MP4 (H.264/AAC consigliato). Dimensione massima: {max} MB.",
+      "uploadingPercent": "Caricamento… {percent}%",
+      "processing": "Verifica del file in corso…"
+    }
+  },
+  "admin": {
+    "users": {
+      "title": "Utenti",
+      "listCaption": "Elenco degli utenti registrati",
+      "empty": "Nessun utente.",
+      "name": "Nome",
+      "email": "Email",
+      "role": "Ruolo",
+      "createdAt": "Creato il",
+      "roles": {
+        "admin": "Amministratore",
+        "user": "Utente"
+      },
+      "create": {
+        "title": "Nuovo utente",
+        "password": "Password iniziale",
+        "passwordHint": "Almeno {min} caratteri.",
+        "submit": "Crea utente",
+        "submitting": "Creazione in corso…",
+        "success": "Utente creato.",
+        "errors": {
+          "invalid": "Controlla i dati inseriti.",
+          "emailTaken": "Esiste già un utente con questa email.",
+          "generic": "Impossibile creare l'utente. Riprova."
+        }
+      }
+    }
+  },
+  "scorm": {
+    "expired": "La sessione del contenuto è scaduta o non è valida. Torna alla lezione e ricarica la pagina.",
+    "saveError": "Impossibile salvare i progressi. Controlla la connessione: verrà fatto un nuovo tentativo al prossimo salvataggio."
+  },
+  "titles": {
+    "login": "Accedi",
+    "courses": "Corsi",
+    "newCourse": "Nuovo corso",
+    "course": "Corso",
+    "lesson": "Lezione",
+    "manage": "Gestione del corso",
+    "editLesson": "Modifica lezione",
+    "users": "Utenti",
+    "notFound": "Pagina non trovata"
+  }
+}
