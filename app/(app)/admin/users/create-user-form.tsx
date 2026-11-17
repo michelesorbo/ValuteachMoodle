@@ -3,12 +3,12 @@
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 import { createUserAction, type CreateUserState } from "@/modules/auth/actions";
-import { GLOBAL_ROLES, MIN_PASSWORD_LENGTH } from "@/modules/auth/roles";
+import { MIN_PASSWORD_LENGTH } from "@/modules/auth/roles";
 
 const initialState: CreateUserState = { status: "idle" };
 const inputClass = "rounded border border-neutral-500 px-3 py-2";
 
-export function CreateUserForm() {
+export function CreateUserForm({ roles }: { roles: { id: string; name: string }[] }) {
   const t = useTranslations("admin.users");
   const [state, formAction, pending] = useActionState(createUserAction, initialState);
 
@@ -48,16 +48,17 @@ export function CreateUserForm() {
             {t("create.passwordHint", { min: MIN_PASSWORD_LENGTH })}
           </p>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-role" className="text-sm font-medium">{t("role")}</label>
-          <select id="new-role" name="role" defaultValue="user" className={inputClass}>
-            {GLOBAL_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {t(`roles.${role}`)}
-              </option>
+        {roles.length > 0 && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">{t("roles")}</legend>
+            {roles.map((role) => (
+              <label key={role.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="roleIds" value={role.id} />
+                {role.name}
+              </label>
             ))}
-          </select>
-        </div>
+          </fieldset>
+        )}
         <p role="status" className="min-h-5 text-sm">
           {state.status === "success" && <span className="text-green-800">{t("create.success")}</span>}
           {state.status === "error" && (

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { isAdmin } from "@/modules/auth/roles";
+import { getGlobalScopes } from "@/modules/auth/access";
 import { requireUser } from "@/modules/auth/session";
 import { LogoutButton } from "./logout-button";
 
@@ -9,7 +9,7 @@ import { LogoutButton } from "./logout-button";
  * Layout for every authenticated page. The session is read at request time, so
  * the user-dependent header streams in behind its own Suspense boundary, while
  * each page wraps its own request-time content in <Suspense> (see PageFallback).
- * Pages must still call requireUser()/requireAdmin() themselves: a layout does
+ * Pages must still call requireUser()/requireScope() themselves: a layout does
  * not protect the pages below it.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -37,6 +37,7 @@ async function AppName() {
 async function HeaderContent() {
   const user = await requireUser();
   const t = await getTranslations("nav");
+  const scopes = await getGlobalScopes(user.id);
 
   return (
     <>
@@ -45,9 +46,14 @@ async function HeaderContent() {
         <Link href="/" className="underline-offset-4 hover:underline">
           {t("home")}
         </Link>
-        {isAdmin(user) && (
+        {scopes.has("users:manage") && (
           <Link href="/admin/users" className="underline-offset-4 hover:underline">
             {t("users")}
+          </Link>
+        )}
+        {scopes.has("roles:manage") && (
+          <Link href="/admin/roles" className="underline-offset-4 hover:underline">
+            {t("roles")}
           </Link>
         )}
       </nav>

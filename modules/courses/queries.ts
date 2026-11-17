@@ -1,35 +1,73 @@
 import "server-only";
-import { and, asc, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { SessionUser } from "@/modules/auth/auth";
-import { isAdmin } from "@/modules/auth/roles";
+import { getGlobalScopes, listRolesWithScopes } from "@/modules/auth/access";
+import { isCourseScope, parseScopes, type Scope } from "@/modules/auth/scopes";
 import { progressFromCounts, type CourseProgress } from "@/modules/progress/progress";
 import { isUuid } from "./access";
-import type { CourseRole } from "./permissions";
+import { canTrackProgress, canViewCourse } from "./permissions";
 
-const { course, courseFile, enrollment, lesson, lessonProgress, scormPackage, user: userTable } = schema;
+const {
+  course,
+  courseFile,
+  enrollment,
+  enrollmentScope,
+  lesson,
+  lessonProgress,
+  role,
+  scormPackage,
+  user: userTable,
+} = schema;
 
 export type CourseListItem = {
   id: string;
   title: string;
   description: string;
-  role: CourseRole | null;
+  /** Name of the user's course role, or null when they see the course through global scopes only. */
+  roleName: string | null;
+  tracksProgress: boolean;
   progress: CourseProgress;
 };
 
-/** Courses visible to the user: all of them for an admin, otherwise only the ones they are enrolled in. */
+/**
+ * Courses visible to the user: every course when they hold `course:view` globally,
+ * otherwise the ones they are enrolled in with a role (or extra scopes) that includes `course:view`.
+ */
 export async function listCoursesFor(user: SessionUser): Promise<CourseListItem[]> {
-  const rows = await db
-    .select({
-      id: course.id,
-      title: course.title,
-      description: course.description,
-      role: enrollment.role,
+  const globalCourseScopes = new Set([...(await getGlobalScopes(user.id))].filter(isCourseScope));
+  const [allRows, roles, extras] = await Promise.all([
+    db
+      .select({
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        enrollmentId: enrollment.id,
+        roleId: enrollment.roleId,
+        roleName: role.name,
+      })
+      .from(course)
+      .leftJoin(enrollment, and(eq(enrollment.courseId, course.id), eq(enrollment.userId, user.id)))
+      .leftJoin(role, eq(role.id, enrollment.roleId))
+      .orderBy(asc(course.title)),
+    listRolesWithScopes("course"),
+    db
+      .select({ enrollmentId: enrollmentScope.enrollmentId, scope: enrollmentScope.scope })
+      .from(enrollmentScope)
+      .innerJoin(enrollment, eq(enrollment.id, enrollmentScope.enrollmentId))
+      .where(eq(enrollment.userId, user.id)),
+  ]);
+
+  const scopesOfRole = new Map(roles.map((entry) => [entry.id, entry.scopes]));
+  const rows = allRows
+    .map((row) => {
+      const scopes = new Set<Scope>(globalCourseScopes);
+      for (const scope of (row.roleId && scopesOfRole.get(row.roleId)) || []) scopes.add(scope);
+      const own = extras.filter((extra) => extra.enrollmentId === row.enrollmentId).map((extra) => extra.scope);
+      for (const scope of parseScopes(own)) if (isCourseScope(scope)) scopes.add(scope);
+      return { ...row, access: { scopes } };
     })
-    .from(course)
-    .leftJoin(enrollment, and(eq(enrollment.courseId, course.id), eq(enrollment.userId, user.id)))
-    .where(isAdmin(user) ? undefined : isNotNull(enrollment.role))
-    .orderBy(asc(course.title));
+    .filter((row) => canViewCourse(row.access));
   if (rows.length === 0) return [];
 
   const courseIds = rows.map((row) => row.id);
@@ -49,7 +87,11 @@ export async function listCoursesFor(user: SessionUser): Promise<CourseListItem[
   const completedByCourse = new Map(completed.map((row) => [row.courseId, row.completed]));
 
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    roleName: row.roleName,
+    tracksProgress: canTrackProgress(row.access),
     progress: progressFromCounts(completedByCourse.get(row.id) ?? 0, totalByCourse.get(row.id) ?? 0),
   }));
 }
@@ -99,12 +141,14 @@ export async function listMembers(courseId: string) {
       userId: userTable.id,
       name: userTable.name,
       email: userTable.email,
-      role: enrollment.role,
+      roleId: enrollment.roleId,
+      roleName: role.name,
     })
     .from(enrollment)
     .innerJoin(userTable, eq(userTable.id, enrollment.userId))
+    .innerJoin(role, eq(role.id, enrollment.roleId))
     .where(eq(enrollment.courseId, courseId))
-    .orderBy(asc(enrollment.role), asc(userTable.name));
+    .orderBy(asc(role.name), asc(userTable.name));
 
   const completed = await db
     .select({ userId: lessonProgress.userId, completed: count() })
@@ -114,7 +158,18 @@ export async function listMembers(courseId: string) {
     .groupBy(lessonProgress.userId);
   const completedByUser = new Map(completed.map((row) => [row.userId, row.completed]));
 
-  return members.map((member) => ({ ...member, completed: completedByUser.get(member.userId) ?? 0 }));
+  const extras = await db
+    .select({ enrollmentId: enrollmentScope.enrollmentId, scope: enrollmentScope.scope })
+    .from(enrollmentScope)
+    .innerJoin(enrollment, eq(enrollment.id, enrollmentScope.enrollmentId))
+    .where(eq(enrollment.courseId, courseId));
+
+  return members.map((member) => ({
+    ...member,
+    completed: completedByUser.get(member.userId) ?? 0,
+    /** Scopes assigned to this enrollment on top of the role. */
+    extraScopes: parseScopes(extras.filter((extra) => extra.enrollmentId === member.enrollmentId).map((extra) => extra.scope)),
+  }));
 }
 
 /** Users that are not enrolled in the course yet. */

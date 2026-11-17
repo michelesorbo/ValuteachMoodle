@@ -1,10 +1,10 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import type { Course } from "@/db/schema";
 import type { SessionUser } from "@/modules/auth/auth";
-import { isAdmin } from "@/modules/auth/roles";
+import { getCourseScopes } from "@/modules/auth/access";
 import { getCurrentUser } from "@/modules/auth/session";
 import { canManageCourse, canViewCourse, type CourseAccess } from "./permissions";
 
@@ -30,26 +30,19 @@ export async function getCourseContext(courseId: string): Promise<CourseContext 
   const user = await getCurrentUser();
   if (!user || !isUuid(courseId)) return null;
 
-  const [row] = await db
-    .select({ course: schema.course, role: schema.enrollment.role })
-    .from(schema.course)
-    .leftJoin(
-      schema.enrollment,
-      and(eq(schema.enrollment.courseId, schema.course.id), eq(schema.enrollment.userId, user.id)),
-    )
-    .where(eq(schema.course.id, courseId));
-  if (!row) return null;
+  const [course] = await db.select().from(schema.course).where(eq(schema.course.id, courseId));
+  if (!course) return null;
 
-  return { user, course: row.course, access: { isAdmin: isAdmin(user), role: row.role } };
+  return { user, course, access: { scopes: await getCourseScopes(user.id, course.id) } };
 }
 
-/** Course context only if the current user may see the course (enrolled or admin). */
+/** Course context only if the current user may see the course (course:view). */
 export async function getViewableCourse(courseId: string): Promise<CourseContext | null> {
   const context = await getCourseContext(courseId);
   return context && canViewCourse(context.access) ? context : null;
 }
 
-/** Course context only if the current user may manage the course (teacher of it or admin). */
+/** Course context only if the current user may manage the course (course:manage). */
 export async function getManageableCourse(courseId: string): Promise<CourseContext | null> {
   const context = await getCourseContext(courseId);
   return context && canManageCourse(context.access) ? context : null;

@@ -2,8 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getGlobalScopes } from "./access";
 import { auth, type SessionUser } from "./auth";
-import { isAdmin } from "./roles";
+import type { Scope } from "./scopes";
 
 /**
  * Data-access layer for the session. Every page, server action and route handler
@@ -21,8 +22,10 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-export async function requireAdmin(): Promise<SessionUser> {
+/** Requires a signed-in user holding the given global scope; otherwise sends them home. */
+export async function requireScope(scope: Scope): Promise<{ user: SessionUser; scopes: ReadonlySet<Scope> }> {
   const user = await requireUser();
-  if (!isAdmin(user)) redirect("/");
-  return user;
+  const scopes = await getGlobalScopes(user.id);
+  if (!scopes.has(scope)) redirect("/");
+  return { user, scopes };
 }

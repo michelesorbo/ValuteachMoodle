@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Lesson, ScormPackage } from "@/db/schema";
-import { isAdmin } from "@/modules/auth/roles";
+import { getCourseScopes } from "@/modules/auth/access";
 import { env } from "@/modules/config/env";
 import { canTrackProgress, canViewCourse, type CourseAccess } from "@/modules/courses/permissions";
 import { scormOrigin } from "./origin";
@@ -15,7 +15,7 @@ import {
 } from "./token";
 import { applyCommit, emptyAttempt, type AttemptState, type CommitInput } from "./tracking";
 
-const { enrollment, lesson, lessonProgress, scormAttempt, scormPackage, user } = schema;
+const { lesson, lessonProgress, scormAttempt, scormPackage, user } = schema;
 
 /**
  * URL of the player on the SCORM origin for one user and one SCORM lesson.
@@ -49,8 +49,8 @@ export type ScormSession = {
 
 /**
  * Resolves a token to a live session. Besides the signature and expiry, it re-checks
- * in the database that the lesson still uses that package and that the user is still
- * enrolled in the course (or is an admin): removing an enrollment takes effect at once
+ * in the database that the lesson still uses that package and that the user may still
+ * view the course: removing an enrollment takes effect at once
  * for the player and for tracking.
  */
 export async function loadScormSession(token: string): Promise<ScormSession | null> {
@@ -65,13 +65,12 @@ export async function loadScormSession(token: string): Promise<ScormSession | nu
   if (!row || row.pkg.storageKey !== payload.packageKey) return null;
 
   const [account] = await db
-    .select({ id: user.id, name: user.name, role: user.role, banned: user.banned, courseRole: enrollment.role })
+    .select({ id: user.id, name: user.name, banned: user.banned })
     .from(user)
-    .leftJoin(enrollment, and(eq(enrollment.userId, user.id), eq(enrollment.courseId, row.lesson.courseId)))
     .where(eq(user.id, payload.userId));
   if (!account || account.banned) return null;
 
-  const access: CourseAccess = { isAdmin: isAdmin(account), role: account.courseRole };
+  const access: CourseAccess = { scopes: await getCourseScopes(account.id, row.lesson.courseId) };
   if (!canViewCourse(access)) return null;
 
   return { payload, user: { id: account.id, name: account.name }, lesson: row.lesson, pkg: row.pkg, access };

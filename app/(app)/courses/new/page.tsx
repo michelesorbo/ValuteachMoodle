@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireScope } from "@/modules/auth/session";
 import { createCourseAction } from "@/modules/courses/actions";
 import { ActionForm } from "../../action-form";
 import { PageFallback } from "../../page-fallback";
@@ -22,7 +22,7 @@ export default function NewCoursePage() {
 }
 
 async function NewCourse() {
-  await requireAdmin();
+  await requireScope("courses:create");
   const t = await getTranslations("courses");
 
   return (

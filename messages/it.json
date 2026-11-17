@@ -10,14 +10,17 @@
     "home": "Corsi",
     "users": "Utenti",
     "signedInAs": "Accesso effettuato come {name}",
-    "logout": "Esci"
+    "logout": "Esci",
+    "roles": "Ruoli"
   },
   "errors": {
     "invalid": "Controlla i dati inseriti.",
     "forbidden": "Non hai i permessi per questa operazione.",
     "notFound": "Elemento non trovato.",
     "alreadyEnrolled": "L'utente è già iscritto a questo corso.",
-    "generic": "Si è verificato un errore. Riprova."
+    "generic": "Si è verificato un errore. Riprova.",
+    "alreadyExists": "Esiste già un elemento con questo nome.",
+    "inUse": "Il ruolo è ancora assegnato a utenti o iscrizioni: rimuovilo prima da lì."
   },
   "notFound": {
     "title": "Pagina non trovata",
@@ -37,11 +40,6 @@
     }
   },
   "courses": {
-    "roles": {
-      "student": "Studente",
-      "teacher": "Docente",
-      "admin": "Amministratore"
-    },
     "lessonTypes": {
       "text": "Testo",
       "file": "File",
@@ -61,9 +59,7 @@
     "list": {
       "title": "Ciao, {name}",
       "subtitle": "I tuoi corsi",
-      "subtitleAdmin": "Tutti i corsi",
       "empty": "Non sei ancora iscritto a nessun corso.",
-      "emptyAdmin": "Non ci sono ancora corsi.",
       "new": "Nuovo corso",
       "yourRole": "Il tuo ruolo: {role}"
     },
@@ -154,7 +150,11 @@
       "videoFile": "Video (.mp4)",
       "videoHint": "File MP4 (H.264/AAC consigliato). Dimensione massima: {max} MB.",
       "uploadingPercent": "Caricamento… {percent}%",
-      "processing": "Verifica del file in corso…"
+      "processing": "Verifica del file in corso…",
+      "editEnrollment": "Modifica ruolo e permessi",
+      "extraScopes": "Permessi aggiuntivi",
+      "extraScopesHint": "Si sommano a quelli del ruolo, solo per questo utente in questo corso.",
+      "memberRole": "Funzione nel corso"
     }
   },
   "admin": {
@@ -164,12 +164,8 @@
       "empty": "Nessun utente.",
       "name": "Nome",
       "email": "Email",
-      "role": "Ruolo",
       "createdAt": "Creato il",
-      "roles": {
-        "admin": "Amministratore",
-        "user": "Utente"
-      },
+      "roles": "Ruoli",
       "create": {
         "title": "Nuovo utente",
         "password": "Password iniziale",
@@ -180,8 +176,52 @@
         "errors": {
           "invalid": "Controlla i dati inseriti.",
           "emailTaken": "Esiste già un utente con questa email.",
-          "generic": "Impossibile creare l'utente. Riprova."
+          "generic": "Impossibile creare l'utente. Riprova.",
+          "forbidden": "Non puoi assegnare un ruolo con permessi che non possiedi."
         }
+      },
+      "actions": "Azioni",
+      "editAccess": "Modifica accessi",
+      "back": "Torna agli utenti",
+      "selfLocked": "Non puoi modificare i tuoi stessi accessi.",
+      "access": {
+        "roles": "Ruoli globali",
+        "rolesHint": "Puoi assegnare solo ruoli i cui permessi possiedi anche tu.",
+        "scopes": "Permessi diretti",
+        "scopesHint": "Permessi assegnati solo a questo utente, oltre a quelli dei ruoli. I permessi del corso valgono in tutti i corsi.",
+        "save": "Salva accessi",
+        "saved": "Accessi aggiornati."
+      }
+    },
+    "roles": {
+      "title": "Ruoli",
+      "intro": "Un ruolo è un insieme di permessi (scope). I ruoli globali si assegnano agli utenti e valgono su tutta la piattaforma; i ruoli del corso si assegnano con l'iscrizione e valgono in quel corso.",
+      "listCaption": "Elenco dei ruoli",
+      "name": "Nome",
+      "description": "Descrizione",
+      "kind": "Tipo",
+      "scopes": "Permessi",
+      "scopesCount": "Permessi",
+      "type": "Origine",
+      "kinds": {
+        "global": "Globale",
+        "course": "Del corso"
+      },
+      "kindHint": "Un ruolo del corso può contenere solo permessi del corso. Il tipo non si può cambiare dopo la creazione.",
+      "scopesHint": "Puoi includere solo permessi che possiedi anche tu.",
+      "system": "Predefinito",
+      "custom": "Personalizzato",
+      "back": "Torna ai ruoli",
+      "adminLocked": "Il ruolo Amministratore comprende sempre tutti i permessi (tranne «Seguire i corsi») e non si può modificare.",
+      "create": {
+        "title": "Nuovo ruolo",
+        "submit": "Crea ruolo"
+      },
+      "edit": {
+        "save": "Salva ruolo",
+        "saved": "Ruolo salvato.",
+        "delete": "Elimina ruolo",
+        "deleteConfirm": "Eliminare il ruolo «{name}»?"
       }
     }
   },
@@ -198,6 +238,53 @@
     "manage": "Gestione del corso",
     "editLesson": "Modifica lezione",
     "users": "Utenti",
-    "notFound": "Pagina non trovata"
+    "notFound": "Pagina non trovata",
+    "roles": "Ruoli",
+    "editRole": "Modifica ruolo",
+    "editUser": "Accessi dell'utente"
+  },
+  "scopes": {
+    "groups": {
+      "global": "Permessi globali",
+      "course": "Permessi del corso"
+    },
+    "items": {
+      "users:manage": {
+        "name": "Gestire gli utenti",
+        "description": "Vedere gli utenti, crearli e modificarne ruoli e permessi."
+      },
+      "roles:manage": {
+        "name": "Gestire i ruoli",
+        "description": "Creare, modificare ed eliminare ruoli."
+      },
+      "courses:create": {
+        "name": "Creare corsi",
+        "description": "Creare nuovi corsi."
+      },
+      "course:view": {
+        "name": "Vedere il corso",
+        "description": "Aprire il corso e le sue lezioni."
+      },
+      "course:learn": {
+        "name": "Seguire il corso",
+        "description": "Registrare i propri progressi nelle lezioni."
+      },
+      "course:manage": {
+        "name": "Gestire il corso",
+        "description": "Modificare i dati del corso e le sue lezioni, caricare file."
+      },
+      "course:delete": {
+        "name": "Eliminare il corso",
+        "description": "Eliminare il corso con tutti i suoi contenuti."
+      },
+      "course:enrollments:manage": {
+        "name": "Gestire le iscrizioni",
+        "description": "Iscrivere e rimuovere utenti, cambiarne il ruolo nel corso."
+      },
+      "course:enrollments:assign-privileged": {
+        "name": "Assegnare ruoli di gestione",
+        "description": "Iscrivere utenti con ruoli che possono gestire il corso o le iscrizioni (ad esempio altri docenti)."
+      }
+    }
   }
 }

@@ -5,14 +5,16 @@ import { redirect } from "next/navigation";
 import { and, asc, eq, isNull, max } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { requireAdmin, requireUser } from "@/modules/auth/session";
+import { listRolesWithScopes } from "@/modules/auth/access";
+import { isCourseScope, parseScopes, type Scope } from "@/modules/auth/scopes";
+import { requireScope, requireUser } from "@/modules/auth/session";
 import { courseDirKey, deleteStored } from "@/modules/files/storage";
 import { failure, success, type FormState } from "@/modules/shared/form-state";
 import { getCourseContext, getManageableCourse } from "./access";
-import { canDeleteCourse, canManageEnrollment, COURSE_ROLES } from "./permissions";
+import { canDeleteCourse, canManageEnrollment } from "./permissions";
 import { getLesson } from "./queries";
 
-const { course, courseFile, enrollment, lesson, scormPackage } = schema;
+const { course, courseFile, enrollment, enrollmentScope, lesson, scormPackage } = schema;
 
 const title = z.string().trim().min(1).max(200);
 const courseFields = z.object({ title, description: z.string().trim().max(5000) });
@@ -33,15 +35,15 @@ async function nextPosition(courseId: string): Promise<number> {
 
 // --- courses ---
 
-/** Admin only. */
+/** Needs the global scope `courses:create`. */
 export async function createCourseAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  const admin = await requireAdmin();
+  const { user: creator } = await requireScope("courses:create");
   const parsed = courseFields.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return failure("invalid");
 
   const [created] = await db
     .insert(course)
-    .values({ ...parsed.data, createdBy: admin.id })
+    .values({ ...parsed.data, createdBy: creator.id })
     .returning({ id: course.id });
   refresh();
   redirect(`/courses/${created.id}/manage`);
@@ -59,7 +61,7 @@ export async function updateCourseAction(_previous: FormState, formData: FormDat
   return success;
 }
 
-/** Admin only. Removes the course, its lessons, enrollments, progress and stored files. */
+/** Needs `course:delete`. Removes the course, its lessons, enrollments, progress and stored files. */
 export async function deleteCourseAction(_previous: FormState, formData: FormData): Promise<FormState> {
   await requireUser();
   const context = await getCourseContext(String(formData.get("courseId")));
@@ -258,16 +260,33 @@ export async function moveLessonAction(_previous: FormState, formData: FormData)
 
 // --- enrollments ---
 
-/** Teachers enroll students; only admins assign teachers. */
+const enrollmentFields = z.object({ roleId: z.uuid() });
+
+/** Scopes handed out by an enrollment: those of the course role plus the ones assigned to the enrollment. */
+async function enrollmentScopes(roleId: string, extra: readonly Scope[]): Promise<Scope[] | null> {
+  const [found] = await listRolesWithScopes("course").then((roles) => roles.filter((entry) => entry.id === roleId));
+  return found ? [...new Set([...found.scopes, ...extra])] : null;
+}
+
+/** Course scopes ticked in the form; anything that is not a course scope is rejected. */
+function courseScopesFrom(formData: FormData): Scope[] | null {
+  const values = formData.getAll("scopes").map(String);
+  const parsed = parseScopes(values);
+  return parsed.length === values.length && parsed.every(isCourseScope) ? parsed : null;
+}
+
+/** Needs `course:enrollments:manage`, and the scopes of the chosen role must be ones the actor may hand out. */
 export async function enrollUserAction(_previous: FormState, formData: FormData): Promise<FormState> {
   await requireUser();
-  const context = await getManageableCourse(String(formData.get("courseId")));
+  const context = await getCourseContext(String(formData.get("courseId")));
   if (!context) return failure("forbidden");
-  const parsed = z
-    .object({ userId: z.string().min(1).max(100), role: z.enum(COURSE_ROLES) })
-    .safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return failure("invalid");
-  if (!canManageEnrollment(context.access, parsed.data.role)) return failure("forbidden");
+  const parsed = z.object({ userId: z.string().min(1).max(100) }).extend(enrollmentFields.shape).safeParse(Object.fromEntries(formData));
+  const extra = courseScopesFrom(formData);
+  if (!parsed.success || !extra) return failure("invalid");
+
+  const granted = await enrollmentScopes(parsed.data.roleId, extra);
+  if (!granted) return failure("invalid");
+  if (!canManageEnrollment(context.access, granted)) return failure("forbidden");
 
   const [target] = await db
     .select({ id: schema.user.id })
@@ -275,18 +294,61 @@ export async function enrollUserAction(_previous: FormState, formData: FormData)
     .where(eq(schema.user.id, parsed.data.userId));
   if (!target) return failure("invalid");
 
-  const inserted = await db
-    .insert(enrollment)
-    .values({ courseId: context.course.id, userId: target.id, role: parsed.data.role })
-    .onConflictDoNothing()
-    .returning({ id: enrollment.id });
-  if (inserted.length === 0) return failure("alreadyEnrolled");
+  const created = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(enrollment)
+      .values({ courseId: context.course.id, userId: target.id, roleId: parsed.data.roleId })
+      .onConflictDoNothing()
+      .returning({ id: enrollment.id });
+    if (!inserted) return false;
+    if (extra.length > 0) {
+      await tx.insert(enrollmentScope).values(extra.map((scope) => ({ enrollmentId: inserted.id, scope })));
+    }
+    return true;
+  });
+  if (!created) return failure("alreadyEnrolled");
 
   refresh();
   return success;
 }
 
-/** Teachers remove students; only admins remove teachers. Progress already recorded is kept. */
+/**
+ * Changes the course role and the extra scopes of an enrollment. Both what the member
+ * holds now and what they will hold must be within what the actor may hand out.
+ */
+export async function updateEnrollmentAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  await requireUser();
+  const enrollmentId = z.uuid().safeParse(formData.get("enrollmentId"));
+  const fields = enrollmentFields.safeParse(Object.fromEntries(formData));
+  const extra = courseScopesFrom(formData);
+  if (!enrollmentId.success || !fields.success || !extra) return failure("invalid");
+
+  const [target] = await db.select().from(enrollment).where(eq(enrollment.id, enrollmentId.data));
+  if (!target) return failure("notFound");
+  const context = await getCourseContext(target.courseId);
+  if (!context) return failure("forbidden");
+
+  const currentExtra = await db
+    .select({ scope: enrollmentScope.scope })
+    .from(enrollmentScope)
+    .where(eq(enrollmentScope.enrollmentId, target.id));
+  const before = await enrollmentScopes(target.roleId, parseScopes(currentExtra.map((row) => row.scope)).filter(isCourseScope));
+  const after = await enrollmentScopes(fields.data.roleId, extra);
+  if (!before || !after) return failure("invalid");
+  if (!canManageEnrollment(context.access, [...before, ...after])) return failure("forbidden");
+
+  await db.transaction(async (tx) => {
+    await tx.update(enrollment).set({ roleId: fields.data.roleId }).where(eq(enrollment.id, target.id));
+    await tx.delete(enrollmentScope).where(eq(enrollmentScope.enrollmentId, target.id));
+    if (extra.length > 0) {
+      await tx.insert(enrollmentScope).values(extra.map((scope) => ({ enrollmentId: target.id, scope })));
+    }
+  });
+  refresh();
+  return success;
+}
+
+/** Same rule as enrolling: only people whose scopes the actor may hand out can be removed. Progress already recorded is kept. */
 export async function removeEnrollmentAction(_previous: FormState, formData: FormData): Promise<FormState> {
   await requireUser();
   const enrollmentId = z.uuid().safeParse(formData.get("enrollmentId"));
@@ -294,8 +356,15 @@ export async function removeEnrollmentAction(_previous: FormState, formData: For
 
   const [target] = await db.select().from(enrollment).where(eq(enrollment.id, enrollmentId.data));
   if (!target) return failure("notFound");
-  const context = await getManageableCourse(target.courseId);
-  if (!context || !canManageEnrollment(context.access, target.role)) return failure("forbidden");
+  const context = await getCourseContext(target.courseId);
+  if (!context) return failure("forbidden");
+
+  const extra = await db
+    .select({ scope: enrollmentScope.scope })
+    .from(enrollmentScope)
+    .where(eq(enrollmentScope.enrollmentId, target.id));
+  const granted = await enrollmentScopes(target.roleId, parseScopes(extra.map((row) => row.scope)));
+  if (!granted || !canManageEnrollment(context.access, granted)) return failure("forbidden");
 
   await db.delete(enrollment).where(eq(enrollment.id, target.id));
   refresh();

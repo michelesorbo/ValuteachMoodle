@@ -13,7 +13,7 @@ async function main() {
     throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set");
   }
 
-  const result = await ensureUser({ email, name, password, role: "admin" });
+  const result = await ensureUser({ email, name, password, systemRoles: ["admin"] });
   console.log(
     result === "created"
       ? `Admin ${email} created.`

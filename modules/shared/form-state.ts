@@ -4,6 +4,8 @@ export const FORM_ERRORS = [
   "forbidden",
   "notFound",
   "alreadyEnrolled",
+  "alreadyExists",
+  "inUse",
   "generic",
 ] as const;
 

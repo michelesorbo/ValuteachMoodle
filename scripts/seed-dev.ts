@@ -17,7 +17,7 @@ async function main() {
   if (!password) throw new Error("SEED_DEV_PASSWORD must be set");
 
   for (const user of DEV_USERS) {
-    const result = await ensureUser({ ...user, password, role: "user" });
+    const result = await ensureUser({ ...user, password });
     console.log(`${user.email}: ${result}`);
   }
 }

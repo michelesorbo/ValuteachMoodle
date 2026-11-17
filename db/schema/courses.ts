@@ -12,9 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
-
-/** Role of a user inside one course. The global "admin" role lives on the user. */
-export const courseRole = pgEnum("course_role", ["student", "teacher"]);
+import { role } from "./rbac";
 
 /** "video" and "scorm" are implemented in later phases; declared now to avoid an enum migration. */
 export const lessonType = pgEnum("lesson_type", ["text", "file", "video", "scorm"]);
@@ -41,13 +39,28 @@ export const enrollment = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: courseRole("role").notNull(),
+    /** Course role (kind "course"). Its scopes apply inside this course. */
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => role.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     unique("enrollment_course_user_unique").on(table.courseId, table.userId),
     index("enrollment_user_idx").on(table.userId),
   ],
+);
+
+/** Scopes assigned to one user inside one course, on top of the scopes of their course role. */
+export const enrollmentScope = pgTable(
+  "enrollment_scope",
+  {
+    enrollmentId: uuid("enrollment_id")
+      .notNull()
+      .references(() => enrollment.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.enrollmentId, table.scope] })],
 );
 
 /** A file stored under FILES_DIR. `storageKey` is a server-generated relative path, never user input. */
@@ -142,5 +155,4 @@ export type Course = typeof course.$inferSelect;
 export type Lesson = typeof lesson.$inferSelect;
 export type CourseFile = typeof courseFile.$inferSelect;
 export type ScormPackage = typeof scormPackage.$inferSelect;
-export type CourseRole = (typeof courseRole.enumValues)[number];
 export type LessonType = (typeof lessonType.enumValues)[number];

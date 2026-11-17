@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Scope } from "@/modules/auth/scopes";
 import {
   canCreateCourse,
   canDeleteCourse,
@@ -9,56 +10,65 @@ import {
   type CourseAccess,
 } from "./permissions";
 
-const admin: CourseAccess = { isAdmin: true, role: null };
-const teacher: CourseAccess = { isAdmin: false, role: "teacher" };
-const student: CourseAccess = { isAdmin: false, role: "student" };
-const outsider: CourseAccess = { isAdmin: false, role: null };
+const access = (...scopes: Scope[]): CourseAccess => ({ scopes: new Set(scopes) });
+
+const studentRole: Scope[] = ["course:view", "course:learn"];
+const teacherRole: Scope[] = ["course:view", "course:manage", "course:enrollments:manage"];
+
+const student = access(...studentRole);
+const teacher = access(...teacherRole);
+const admin = access(
+  "course:view",
+  "course:manage",
+  "course:delete",
+  "course:enrollments:manage",
+  "course:enrollments:assign-privileged",
+);
+const outsider = access();
 
 describe("course permissions", () => {
-  it("only admins create and delete courses", () => {
-    expect(canCreateCourse({ isAdmin: true })).toBe(true);
-    expect(canCreateCourse({ isAdmin: false })).toBe(false);
+  it("creating courses is a global scope", () => {
+    expect(canCreateCourse(new Set<Scope>(["courses:create"]))).toBe(true);
+    expect(canCreateCourse(new Set<Scope>(["users:manage"]))).toBe(false);
+  });
+
+  it("only course:delete deletes", () => {
     expect(canDeleteCourse(admin)).toBe(true);
     expect(canDeleteCourse(teacher)).toBe(false);
     expect(canDeleteCourse(student)).toBe(false);
   });
 
-  it("only enrolled users and admins view a course", () => {
-    expect(canViewCourse(admin)).toBe(true);
-    expect(canViewCourse(teacher)).toBe(true);
+  it("viewing needs course:view: enrollment alone is not enough", () => {
     expect(canViewCourse(student)).toBe(true);
+    expect(canViewCourse(teacher)).toBe(true);
     expect(canViewCourse(outsider)).toBe(false);
+    expect(canViewCourse(access("course:learn"))).toBe(false);
   });
 
-  it("admins and the course teachers manage lessons", () => {
+  it("managing lessons needs course:manage", () => {
     expect(canManageCourse(admin)).toBe(true);
     expect(canManageCourse(teacher)).toBe(true);
     expect(canManageCourse(student)).toBe(false);
-    expect(canManageCourse(outsider)).toBe(false);
   });
 
-  it("teachers enroll students but only admins assign teachers", () => {
-    expect(canManageEnrollment(teacher, "student")).toBe(true);
-    expect(canManageEnrollment(teacher, "teacher")).toBe(false);
-    expect(canManageEnrollment(admin, "teacher")).toBe(true);
-    expect(canManageEnrollment(admin, "student")).toBe(true);
-    expect(canManageEnrollment(student, "student")).toBe(false);
-    expect(canManageEnrollment(outsider, "student")).toBe(false);
+  it("teachers enroll students but not other teachers", () => {
+    expect(canManageEnrollment(teacher, studentRole)).toBe(true);
+    expect(canManageEnrollment(teacher, teacherRole)).toBe(false);
+    expect(canManageEnrollment(admin, teacherRole)).toBe(true);
+    expect(canManageEnrollment(student, studentRole)).toBe(false);
+    expect(canManageEnrollment(outsider, studentRole)).toBe(false);
   });
 
-  it("roles are per course: the same person can teach one course and study another", () => {
-    const inCourseA: CourseAccess = { isAdmin: false, role: "teacher" };
-    const inCourseB: CourseAccess = { isAdmin: false, role: "student" };
-    expect(canManageCourse(inCourseA)).toBe(true);
-    expect(canManageCourse(inCourseB)).toBe(false);
-    expect(canTrackProgress(inCourseA)).toBe(false);
-    expect(canTrackProgress(inCourseB)).toBe(true);
+  it("nobody hands out scopes they do not hold", () => {
+    const custom = access("course:view", "course:enrollments:manage");
+    expect(canManageEnrollment(custom, studentRole)).toBe(true);
+    const withPrivilege = access("course:enrollments:manage", "course:enrollments:assign-privileged");
+    expect(canManageEnrollment(withPrivilege, teacherRole)).toBe(false); // course:manage not held
   });
 
-  it("progress is tracked for students only", () => {
+  it("progress is tracked for course:learn only", () => {
     expect(canTrackProgress(student)).toBe(true);
     expect(canTrackProgress(teacher)).toBe(false);
     expect(canTrackProgress(admin)).toBe(false);
-    expect(canTrackProgress({ isAdmin: true, role: "student" })).toBe(true);
   });
 });

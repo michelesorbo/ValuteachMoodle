@@ -29,6 +29,20 @@
       "when": 1794337622854,
       "tag": "0003_video",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794848501090,
+      "tag": "0004_rbac",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794848522845,
+      "tag": "0005_rbac_finish",
+      "breakpoints": true
     }
   ]
 }

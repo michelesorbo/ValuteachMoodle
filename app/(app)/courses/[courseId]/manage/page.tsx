@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { listRolesWithScopes } from "@/modules/auth/access";
 import { requireUser } from "@/modules/auth/session";
 import { env } from "@/modules/config/env";
 import { getManageableCourse } from "@/modules/courses/access";
@@ -12,18 +13,20 @@ import {
   enrollUserAction,
   moveLessonAction,
   removeEnrollmentAction,
+  updateEnrollmentAction,
   createTextLessonAction,
   updateCourseAction,
 } from "@/modules/courses/actions";
 import {
   canDeleteCourse,
   canManageEnrollment,
-  COURSE_ROLES,
+  canTrackProgress,
   type CourseAccess,
 } from "@/modules/courses/permissions";
 import { listEnrollableUsers, listLessons, listMembers } from "@/modules/courses/queries";
 import type { Course } from "@/db/schema";
 import { ActionForm } from "../../../action-form";
+import { ScopeChecklist } from "../../../scope-checklist";
 import { PageFallback } from "../../../page-fallback";
 import { buttonClasses, fieldClass, inputClass, labelClass, linkClass, sectionTitleClass } from "../../../ui";
 import { UploadLessonForm } from "./upload-lesson-form";
@@ -239,12 +242,20 @@ async function Lessons({ course }: { course: Course }) {
 
 async function Members({ course, access }: { course: Course; access: CourseAccess }) {
   const t = await getTranslations("courses");
-  const [members, lessons, candidates] = await Promise.all([
+  const [members, lessons, candidates, roles] = await Promise.all([
     listMembers(course.id),
     listLessons(course.id),
     listEnrollableUsers(course.id),
+    listRolesWithScopes("course"),
   ]);
-  const assignableRoles = COURSE_ROLES.filter((role) => canManageEnrollment(access, role));
+  const canEnroll = access.scopes.has("course:enrollments:manage");
+  // A role can be handed out only if all its scopes are within what the current user may grant.
+  const assignableRoles = roles.filter((role) => canManageEnrollment(access, role.scopes));
+  const scopesOfRole = new Map(roles.map((role) => [role.id, role.scopes]));
+  const grantedTo = (member: (typeof members)[number]) => [
+    ...(scopesOfRole.get(member.roleId) ?? []),
+    ...member.extraScopes,
+  ];
 
   return (
     <section aria-labelledby="iscritti" className="mt-12">
@@ -272,23 +283,68 @@ async function Members({ course, access }: { course: Course; access: CourseAcces
                 <tr key={member.enrollmentId} className="border-b border-neutral-200">
                   <th scope="row" className="py-2 pr-4 font-normal">{member.name}</th>
                   <td className="py-2 pr-4">{member.email}</td>
-                  <td className="py-2 pr-4">{t(`roles.${member.role}`)}</td>
+                  <td className="py-2 pr-4">{member.roleName}</td>
                   <td className="py-2 pr-4">
-                    {member.role === "student"
+                    {canTrackProgress({ scopes: new Set(grantedTo(member)) })
                       ? t("progress.summary", { completed: member.completed, total: lessons.length })
                       : "—"}
                   </td>
                   <td className="py-2">
-                    {canManageEnrollment(access, member.role) && (
-                      <ActionForm
-                        action={removeEnrollmentAction}
-                        submitLabel={t("manage.remove")}
-                        confirmMessage={t("manage.removeConfirm", { name: member.name })}
-                        variant="danger"
-                        inline
-                      >
-                        <input type="hidden" name="enrollmentId" value={member.enrollmentId} />
-                      </ActionForm>
+                    {canManageEnrollment(access, grantedTo(member)) && (
+                      <div className="flex flex-col gap-2">
+                        <ActionForm
+                          action={removeEnrollmentAction}
+                          submitLabel={t("manage.remove")}
+                          confirmMessage={t("manage.removeConfirm", { name: member.name })}
+                          variant="danger"
+                          inline
+                        >
+                          <input type="hidden" name="enrollmentId" value={member.enrollmentId} />
+                        </ActionForm>
+                        <details>
+                          <summary className="cursor-pointer">
+                            {t("manage.editEnrollment")}
+                            <span className="sr-only"> {member.name}</span>
+                          </summary>
+                          <ActionForm
+                            action={updateEnrollmentAction}
+                            submitLabel={t("manage.save")}
+                            successMessage={t("manage.saved")}
+                            className="mt-2 flex max-w-md flex-col gap-3"
+                          >
+                            <input type="hidden" name="enrollmentId" value={member.enrollmentId} />
+                            <div className={fieldClass}>
+                              <label htmlFor={`role-${member.enrollmentId}`} className={labelClass}>
+                                {t("manage.memberRole")}
+                              </label>
+                              <select
+                                id={`role-${member.enrollmentId}`}
+                                name="roleId"
+                                defaultValue={member.roleId}
+                                className={inputClass}
+                              >
+                                {roles
+                                  .filter((role) => role.id === member.roleId || assignableRoles.includes(role))
+                                  .map((role) => (
+                                    <option key={role.id} value={role.id}>
+                                      {role.name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div>
+                              <p className={labelClass}>{t("manage.extraScopes")}</p>
+                              <p className="mb-2 text-sm text-neutral-700">{t("manage.extraScopesHint")}</p>
+                              <ScopeChecklist
+                                groups={["course"]}
+                                selected={member.extraScopes}
+                                lockedUnless={access.scopes}
+                                idPrefix={`member-${member.enrollmentId}`}
+                              />
+                            </div>
+                          </ActionForm>
+                        </details>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -298,8 +354,8 @@ async function Members({ course, access }: { course: Course; access: CourseAcces
         </div>
       )}
 
-      <h3 className="mt-8 text-lg font-semibold">{t("manage.enroll")}</h3>
-      {candidates.length === 0 ? (
+      {canEnroll && <h3 className="mt-8 text-lg font-semibold">{t("manage.enroll")}</h3>}
+      {!canEnroll ? null : candidates.length === 0 ? (
         <p className="mt-3 text-neutral-700">{t("manage.noUsers")}</p>
       ) : (
         <ActionForm
@@ -325,10 +381,10 @@ async function Members({ course, access }: { course: Course; access: CourseAcces
             <label htmlFor="enroll-role" className={labelClass}>
               {t("manage.role")}
             </label>
-            <select id="enroll-role" name="role" defaultValue="student" className={inputClass}>
+            <select id="enroll-role" name="roleId" required className={inputClass}>
               {assignableRoles.map((role) => (
-                <option key={role} value={role}>
-                  {t(`roles.${role}`)}
+                <option key={role.id} value={role.id}>
+                  {role.name}
                 </option>
               ))}
             </select>
